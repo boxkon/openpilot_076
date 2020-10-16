@@ -2,22 +2,32 @@ import json
 import os
 
 
-json_file_name = '/data/atom_076.json'
+json_file_name = '/data/atom_0761.json'
 
 class kegman_conf():
   def __init__(self, CP=None):
     self.config = None
-    self.init = { "sR_KpV1":[0.11,0.13], "sR_KiV1":[0.008,0.015], "sR_KdV1":[0.0,0.0], "sR_KfV1":[0.000001,0.00003],  \
-                  "sR_KpV2":[0.12,0.15], "sR_KiV2":[0.010,0.020], "sR_KdV2":[0.0,0.0], "sR_KfV2":[0.000001,0.00003], \
-                  "sR_BPV":[0.0,0.0], "sR_boostV":[0.0,0.0], "cvBPV":[90,255], \
-                  "cvSteerMaxV1":[255,200], "cvSteerDeltaUpV1":[3,2], "cvSteerDeltaDnV1":[5,3], \
-                  "cvSteerMaxV2":[255,200], "cvSteerDeltaUpV2":[3,2], "cvSteerDeltaDnV2":[5,3], \
-                  "steerRatio":12.0, "steerRateCost":0.5, \
-                  "tire_stiffness_factor":1.0, \
-                  "deadzone":0.0, "steerOffset":0.0, "cameraOffset":0.06, \
-                  "steerLimitTimer":0.4,
-                  "steerActuatorDelay":0.1 }
-
+    self.init = { 
+        "tun_type": "lqr",
+        "cv_KPH": [10,30,40],
+        "cv_BPV": [[30,80,255],[100,150,255],[100,150,255]],
+        "cv_sMaxV": [[150,130,100],[255,250,200],[255,255,200]],
+        "cv_sdDNV": [[2,2,1],[5,3,2],[7,7,5]],
+        "cv_sdUPV": [[1,1,1],[3,2,1],[3,3,3]],
+        "sR_KPH": [30,60],
+        "sR_BPV": [[-5,0,5],[-5,0,5]],
+        "sR_lqr_kiV": [[0.0,0.0,0.0],[0.02,0.02,0.02]],
+        "sR_lqr_scaleV": [[1900,2200,1900],[1800,2000,1800]],
+        "sR_pid_KiV": [[0.02,0.01,0.02],[0.03,0.02,0.03]],
+        "sR_pid_KpV": [[0.2,0.15,0.2],[0.25,0.2,0.25]],
+        "sR_pid_deadzone": 0.1,
+        "sR_steerRatioV": [[15.1,15.2,15.1],[15.3,15.6,15.3]],
+        "sR_ActuatorDelayV": [[0.325,0.3,0.325],[0.325,0.5,0.325]],
+        "steerLimitTimer": 0.8,
+        "steerOffset": 0.0,
+        "steerRateCost": 0.5,
+        "cameraOffset": 0.05
+         }
 
 
   def data_check(self, name, value ):

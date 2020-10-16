@@ -15,7 +15,8 @@
 #include "ui.hpp"
 #include "dashcam.h"
 
-int  is_awake_command = false;
+
+int  old_cruiseSwState = 0;
 
 static int last_brightness = -1;
 static void set_brightness(UIState *s, int brightness) {
@@ -226,7 +227,8 @@ static void ui_init(UIState *s) {
 
   pthread_mutex_init(&s->lock, NULL);
   s->sm = new SubMaster({"model", "controlsState", "carState", "uiLayoutState", "liveCalibration", "radarState", "thermal",
-                         "health", "ubloxGnss", "driverState", "dMonitoringState", "offroadLayout", "carParams"
+                         "health", "ubloxGnss", "driverState", "dMonitoringState", "offroadLayout", "carParams", "liveMpc", 
+                         "liveParameters", "pathPlan"
 #ifdef SHOW_SPEEDLIMIT
                         , "liveMapData"
 #endif
@@ -337,7 +339,8 @@ static void update_status(UIState *s, int status) {
   }
 }
 
-void handle_message(UIState *s, SubMaster &sm) {
+void handle_message(UIState *s, SubMaster &sm) 
+{
   UIScene &scene = s->scene;
   if (s->started && sm.updated("controlsState")) {
     auto event = sm["controlsState"];
@@ -350,6 +353,7 @@ void handle_message(UIState *s, SubMaster &sm) {
       scene.v_cruise_update_ts = event.getLogMonoTime();
     }
 
+    scene.model_sum = data.getModelSum();
     scene.canErrorCounter = data.getCanErrorCounter();
     scene.v_cruise = data.getVCruise();
     scene.v_ego = data.getVEgo();
@@ -364,12 +368,18 @@ void handle_message(UIState *s, SubMaster &sm) {
     auto alert_sound = data.getAlertSound();
     const auto sound_none = cereal::CarControl::HUDControl::AudibleAlert::NONE;
 
-    if( scene.canErrorCounter > 0)
+    if( scene.cruiseState.cruiseSwState != old_cruiseSwState )
     {
-      is_awake_command = true;
+      old_cruiseSwState = scene.cruiseState.cruiseSwState;
+       ui_awake_aleat( s );
+    } 
+    else if( scene.canErrorCounter > 0)
+    {
+       ui_awake_aleat( s );
     }
+  
     if (alert_sound != s->alert_sound){
-      is_awake_command = true;
+      ui_awake_aleat( s );
       if (s->alert_sound != sound_none){
         stop_alert_sound(s->alert_sound);
       }
@@ -385,10 +395,10 @@ void handle_message(UIState *s, SubMaster &sm) {
     scene.alert_size = data.getAlertSize();
     auto alertStatus = data.getAlertStatus();
     if (alertStatus == cereal::ControlsState::AlertStatus::USER_PROMPT) {
-      is_awake_command = true;
+      ui_awake_aleat( s );
       update_status(s, STATUS_WARNING);
     } else if (alertStatus == cereal::ControlsState::AlertStatus::CRITICAL) {
-      is_awake_command = true;
+      ui_awake_aleat( s );
       update_status(s, STATUS_ALERT);
     } else{
       update_status(s, scene.engaged ? STATUS_ENGAGED : STATUS_DISENGAGED);
@@ -396,6 +406,7 @@ void handle_message(UIState *s, SubMaster &sm) {
 
     scene.alert_blinkingrate = data.getAlertBlinkingRate();
     if (scene.alert_blinkingrate > 0.) {
+      ui_awake_aleat( s );
       if (s->alert_blinked) {
         if (s->alert_blinking_alpha > 0.0 && s->alert_blinking_alpha < 1.0) {
           s->alert_blinking_alpha += (0.05*scene.alert_blinkingrate);
@@ -418,25 +429,16 @@ void handle_message(UIState *s, SubMaster &sm) {
     std::string user_text2 = data.getAlertTextMsg2();
     const char* va_text1 = user_text1.c_str();
     const char* va_text2 = user_text2.c_str();    
-    if (va_text1) 
-      snprintf(scene.alert.text1, sizeof(scene.alert.text1), "%s", va_text1);
-    else 
-      scene.alert.text1[0] = '\0';
+    if (va_text1) snprintf(scene.alert.text1, sizeof(scene.alert.text1), "%s", va_text1);
+    else  scene.alert.text1[0] = '\0';
 
-    if (va_text2) 
-      snprintf(scene.alert.text2, sizeof(scene.alert.text2), "%s", va_text2);
-    else 
-      scene.alert.text2[0] = '\0';
+    if (va_text2) snprintf(scene.alert.text2, sizeof(scene.alert.text2), "%s", va_text2);
+    else scene.alert.text2[0] = '\0';
 
-
-    scene.steerOverride = data.getSteerOverride();
-
-    auto pdata = data.getLateralControlState();
-    auto piddata = pdata.getPidState();
-
-    scene.output_scale = piddata.getOutput();
-
+    scene.kegman.output_scale = data.getOutput();
+    scene.kegman.steerOverride = data.getSteerOverride();
   }
+
   if (sm.updated("radarState")) {
     auto data = sm["radarState"].getRadarState();
 
@@ -450,7 +452,7 @@ void handle_message(UIState *s, SubMaster &sm) {
     scene.lead_d_rel2 = leaddatad2.getDRel();
     scene.lead_y_rel2 = leaddatad2.getYRel();
     scene.lead_v_rel2 = leaddatad2.getVRel();
-    s->livempc_or_radarstate_changed = true;
+    s->livempc_or_radarstate_changed |= 1;
   }
   if (sm.updated("liveCalibration")) {
     scene.world_objects_visible = true;
@@ -463,16 +465,16 @@ void handle_message(UIState *s, SubMaster &sm) {
     read_model(scene.model, sm["model"].getModel());
     s->model_changed = true;
   }
-  // else if (which == cereal::Event::LIVE_MPC) {
-  //   auto data = event.getLiveMpc();
-  //   auto x_list = data.getX();
-  //   auto y_list = data.getY();
-  //   for (int i = 0; i < 50; i++){
-  //     scene.mpc_x[i] = x_list[i];
-  //     scene.mpc_y[i] = y_list[i];
-  //   }
-  //   s->livempc_or_radarstate_changed = true;
-  // }
+  if (sm.updated("liveMpc")) {
+     auto data = sm["liveMpc"].getLiveMpc();
+     auto x_list = data.getX();
+     auto y_list = data.getY();
+     for (int i = 0; i < 50; i++){
+       scene.mpc_x[i] = x_list[i];
+       scene.mpc_y[i] = y_list[i];
+     }
+     s->livempc_or_radarstate_changed |= 2;
+  }
   if (sm.updated("uiLayoutState")) {
     auto data = sm["uiLayoutState"].getUiLayoutState();
     s->active_app = data.getActiveApp();
@@ -495,7 +497,6 @@ void handle_message(UIState *s, SubMaster &sm) {
     scene.freeSpace = data.getFreeSpace();
     scene.thermalStatus = data.getThermalStatus();
     scene.paTemp = data.getPa0();
-    scene.ipAddr = data.getIpAddr();
 
     scene.maxBatTemp = data.getBat();
     scene.maxCpuTemp = data.getCpu0(); 
@@ -542,29 +543,38 @@ void handle_message(UIState *s, SubMaster &sm) {
 
     scene.cruiseState.standstill = cruiseState.getStandstill();
     scene.cruiseState.modeSel = cruiseState.getModeSel();
+    scene.cruiseState.cruiseSwState = cruiseState.getCruiseSwState();
 
 
     auto getWheelSpeeds = data.getWheelSpeeds();
     scene.wheel.fl = getWheelSpeeds.getFl();
     scene.wheel.fr = getWheelSpeeds.getFr();
     scene.wheel.rl = getWheelSpeeds.getRl();
-    scene.wheel.rr = getWheelSpeeds.getRr();    
+    scene.wheel.rr = getWheelSpeeds.getRr();
+
+    int  ngetGearShifter = int(scene.getGearShifter);
+  switch( ngetGearShifter )
+  {
+    case 1 :  ui_awake_aleat( s ); break;  // D
+    case 4 :  ui_awake_aleat( s ); break;  // R
+  }        
   }
 
   if (sm.updated("carParams")) {
     auto data = sm["carParams"].getCarParams();
     scene.carParams.steerRatio = data.getSteerRatio();
 
+
     auto lateralsRatom = data.getLateralsRatom();
     scene.carParams.lateralsRatom.learnerParams = lateralsRatom.getLearnerParams();
     scene.carParams.lateralsRatom.deadzone  = lateralsRatom.getDeadzone();
     scene.carParams.lateralsRatom.steerOffset  = lateralsRatom.getSteerOffset();
-    scene.carParams.lateralsRatom.tireStiffnessFactor  = lateralsRatom.getTireStiffnessFactor();
+    scene.carParams.lateralsRatom.cameraOffset = lateralsRatom.getCameraOffset();    
   }
 
-/*  
+
   if (sm.updated("liveParameters")) {
-    auto data = sm["liveParameters"].getLiveParametersData();
+    auto data = sm["liveParameters"].getLiveParameters();
     scene.liveParams.gyroBias = data.getGyroBias();
     scene.liveParams.angleOffset = data.getAngleOffset();
     scene.liveParams.angleOffsetAverage = data.getAngleOffsetAverage();
@@ -573,7 +583,26 @@ void handle_message(UIState *s, SubMaster &sm) {
     scene.liveParams.yawRate = data.getYawRate();
     scene.liveParams.posenetSpeed = data.getPosenetSpeed();
   }
-  */  
+  
+  if( sm.updated("pathPlan") )
+  {
+    auto data = sm["pathPlan"].getPathPlan();
+
+    scene.pathPlan.laneWidth = data.getLaneWidth();
+    scene.pathPlan.steerRatio = data.getSteerRatio();
+    scene.pathPlan.cProb = data.getCProb();
+    scene.pathPlan.lProb = data.getLProb();
+    scene.pathPlan.rProb = data.getRProb();
+    scene.pathPlan.angleOffset = data.getAngleOffset();
+    scene.pathPlan.steerActuatorDelay = data.getSteerActuatorDelay();
+
+    auto l_list = data.getLPoly();
+    auto r_list = data.getRPoly();
+
+    scene.pathPlan.lPoly = l_list[3];
+    scene.pathPlan.rPoly = r_list[3];
+  }
+
 
   s->started = s->thermal_started || s->preview_started ;
   // Handle onroad/offroad transition
@@ -954,11 +983,13 @@ int main(int argc, char* argv[]) {
   int draws = 0;
 
   UIScene &scene = s->scene;
-  s->scene.satelliteCount = -1;
+  scene.satelliteCount = -1;
+  scene.batteryPercent = 50;
   s->started = false;
   s->vision_seen = false;
   int nAwakeTime = 0;
   int nParamRead = 0;
+  int nFrame30 = 0;
   while (!do_exit) {
     bool should_swap = false;
     if (!s->started) {
@@ -970,6 +1001,13 @@ int main(int argc, char* argv[]) {
     double u1 = millis_since_boot();
 
     // parameter Read.
+    nFrame30++;
+    if( nFrame30 > 8 )
+    {
+      scene.nTimer++;
+      nFrame30 = 0;
+    }
+
     nParamRead++;
     switch( nParamRead )
     {
@@ -1004,10 +1042,10 @@ int main(int argc, char* argv[]) {
     set_brightness(s, (int)smooth_brightness);
 
     // resize vision for collapsing sidebar
-    const bool hasSidebar = !s->scene.uilayout_sidebarcollapsed;
-    s->scene.ui_viz_rx = hasSidebar ? box_x : (box_x - sbr_w + (bdr_s * 2));
-    s->scene.ui_viz_rw = hasSidebar ? box_w : (box_w + sbr_w - (bdr_s * 2));
-    s->scene.ui_viz_ro = hasSidebar ? -(sbr_w - 6 * bdr_s) : 0;
+    const bool hasSidebar = !scene.uilayout_sidebarcollapsed;
+    scene.ui_viz_rx = hasSidebar ? box_x : (box_x - sbr_w + (bdr_s * 2));
+    scene.ui_viz_rw = hasSidebar ? box_w : (box_w + sbr_w - (bdr_s * 2));
+    scene.ui_viz_ro = hasSidebar ? -(sbr_w - 6 * bdr_s) : 0;
 
     // poll for touch events
     int touch_x = -1, touch_y = -1;
@@ -1027,7 +1065,7 @@ int main(int argc, char* argv[]) {
       }
       
     }
-
+    
 
     if (!s->started) {
       // always process events offroad
@@ -1051,13 +1089,13 @@ int main(int argc, char* argv[]) {
       if( maxspeed_calc != _maxspeed_calc)
       {
         _maxspeed_calc = maxspeed_calc;
-        is_awake_command = true;
-      //  LOGW("is_awake_command = true  speed = %d", maxspeed_calc );
+        ui_awake_aleat( s );
+      //  LOGW("s->is_awake_command = true  speed = %d", maxspeed_calc );
       }         
 
-      if( is_awake_command || nAwakeTime == 0 || scene.cruiseState.standstill  )
+      if( s->is_awake_command || nAwakeTime == 0 || scene.cruiseState.standstill  )
       {
-        is_awake_command = false;
+        ui_awake_aleat( s, false );
         set_awake(s, true, nTimeOff);
       }
         
@@ -1071,7 +1109,7 @@ int main(int argc, char* argv[]) {
 
       // Visiond process is just stopped, force a redraw to make screen blank again.
       if (!s->started) {
-        s->scene.uilayout_sidebarcollapsed = false;
+        scene.uilayout_sidebarcollapsed = false;
         update_offroad_layout_state(s);
         ui_draw(s);
         glFinish();
@@ -1093,7 +1131,7 @@ int main(int argc, char* argv[]) {
     if (s->hardware_timeout > 0) {
       s->hardware_timeout--;
     } else {
-      s->scene.hwType = cereal::HealthData::HwType::UNKNOWN;
+      scene.hwType = cereal::HealthData::HwType::UNKNOWN;
     }
 
     // Don't waste resources on drawing in case screen is off
@@ -1110,7 +1148,7 @@ int main(int argc, char* argv[]) {
     } else  {
       //if( scene.params.nOpkrUIVolumeBoost )
       //{
-          int volume = fmin(MAX_VOLUME, MIN_VOLUME + s->scene.v_ego / 5);  // up one notch every 5 m/s
+          int volume = fmin(MAX_VOLUME, MIN_VOLUME + scene.v_ego / 5);  // up one notch every 5 m/s
           set_volume( volume );
       //}
       s->volume_timeout = 5 * UI_FREQ;
@@ -1120,15 +1158,15 @@ int main(int argc, char* argv[]) {
     if (s->controls_timeout > 0) {
       s->controls_timeout--;
     } else {
-      if (s->started && s->controls_seen && s->scene.alert_text2 != "Controls Unresponsive") {
+      if (s->started && s->controls_seen && scene.alert_text2 != "Controls Unresponsive") {
         LOGE("Controls unresponsive");
-        s->scene.alert_size = cereal::ControlsState::AlertSize::FULL;
+        scene.alert_size = cereal::ControlsState::AlertSize::FULL;
         update_status(s, STATUS_ALERT);
 
-        s->scene.alert_text1 = "TAKE CONTROL IMMEDIATELY";
-        s->scene.alert_text2 = "Controls Unresponsive";
-
-        ui_draw_vision_alert(s, s->scene.alert_size, s->status, s->scene.alert_text1.c_str(), s->scene.alert_text2.c_str());
+        scene.alert_text1 = "TAKE CONTROL IMMEDIATELY";
+        scene.alert_text2 = "Controls Unresponsive";
+        ui_awake_aleat( s );
+        ui_draw_vision_alert(s, scene.alert_size, s->status, scene.alert_text1.c_str(), scene.alert_text2.c_str());
 
         s->alert_sound_timeout = 2 * UI_FREQ;
         s->alert_sound = cereal::CarControl::HUDControl::AudibleAlert::CHIME_WARNING_REPEAT;
@@ -1153,11 +1191,11 @@ int main(int argc, char* argv[]) {
     int param_read = read_param_uint64_timeout(&s->last_athena_ping, "LastAthenaPingTime", &s->last_athena_ping_timeout);
     if (param_read != -1) { // Param was updated this loop
       if (param_read != 0) { // Failed to read param
-        s->scene.athenaStatus = NET_DISCONNECTED;
+        scene.athenaStatus = NET_DISCONNECTED;
       } else if (nanos_since_boot() - s->last_athena_ping < 70e9) {
-        s->scene.athenaStatus = NET_CONNECTED;
+        scene.athenaStatus = NET_CONNECTED;
       } else {
-        s->scene.athenaStatus = NET_ERROR;
+        scene.athenaStatus = NET_ERROR;
       }
     }
     update_offroad_layout_timeout(s, &s->offroad_layout_timeout);

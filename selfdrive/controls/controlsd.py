@@ -81,6 +81,7 @@ class Controls:
 
     self.CI, self.CP = get_car(self.can_sock, self.pm.sock['sendcan'], has_relay)
 
+
     # read params
     params = Params()
     self.is_metric = params.get("IsMetric", encoding='utf8') == "1"
@@ -125,6 +126,7 @@ class Controls:
     elif self.CP.lateralTuning.which() == 'lqr':
       self.LaC = LatControlLQR(self.CP)
 
+    self.model_sum = 0
     self.state = State.disabled
     self.enabled = False
     self.active = False
@@ -140,10 +142,6 @@ class Controls:
     self.events_prev = []
     self.current_alert_types = []
 
-    self.controlsAllowed = 0
-    self.timer_alloowed = 0
-
-
     self.sm['liveCalibration'].calStatus = Calibration.INVALID
     self.sm['thermal'].freeSpace = 1.
     self.sm['dMonitoringState'].events = []
@@ -156,8 +154,8 @@ class Controls:
 
     if not sounds_available:
       self.events.add(EventName.soundsUnavailable, static=True)
-    #if internet_needed:
-    #  self.events.add(EventName.internetConnectivityNeeded, static=True)
+    if internet_needed:
+      self.events.add(EventName.internetConnectivityNeeded, static=True)
     if community_feature_disallowed:
       self.events.add(EventName.communityFeatureDisallowed, static=True)
     if self.read_only and not passive:
@@ -176,6 +174,24 @@ class Controls:
     self.hyundai_lkas = self.read_only  #read_only
     self.init_flag = True
 
+
+    self.timer_alloowed = 1500
+    self.timer_start = 1500
+
+  def auto_enable(self, CS):
+    if self.startup_event != None:
+      self.timer_alloowed = 500
+    elif self.hyundai_lkas or CS.vEgo < 15*CV.KPH_TO_MS or CS.gearShifter != 2:
+      if self.timer_alloowed < 100:
+        self.timer_alloowed = 100
+    elif self.state != State.enabled:
+      if self.timer_alloowed:
+        self.timer_alloowed -= 1
+      else:
+        self.timer_alloowed = 500
+        self.events.add( EventName.pcmEnable )
+    else:
+        self.timer_alloowed = 100
 
   def update_events(self, CS):
     """Compute carEvents from carState"""
@@ -262,6 +278,8 @@ class Controls:
     #if CS.brakePressed and self.sm['plan'].vTargetFuture >= STARTING_TARGET_SPEED \
     #   and not self.CP.radarOffCan and CS.vEgo < 0.3:
     #  self.events.add(EventName.noTarget)
+
+    self.auto_enable( CS )
 
 
   def data_sample(self):
@@ -367,17 +385,7 @@ class Controls:
     # Check if openpilot is engaged
     self.enabled = self.active or self.state == State.preEnabled
 
-    if not self.controlsAllowed:
-      self.timer_alloowed = 0
-    elif self.enabled != self.controlsAllowed:
-      self.timer_alloowed += 1
-      if CS.vEgo > 15*CV.KPH_TO_MS and CS.gearShifter == 2 and self.timer_alloowed > 10:
-        self.state = State.enabled
-
-  
-      
-  
-    #print( 'enable={} active={} controlsAllowed={} self.state={}'.format( self.enabled, self.active, self.controlsAllowed, self.state ) )
+    #print( 'enable={} self.active={}'.format( self.enabled, self.active ) )
 
   def state_control(self, CS):
     """Given the state, this function returns an actuators packet"""
@@ -447,9 +455,8 @@ class Controls:
     log_alertTextMsg1 = trace1.global_alertTextMsg1
     log_alertTextMsg2 = trace1.global_alertTextMsg2
 
-    self.controlsAllowed = self.sm['health'].controlsAllowed
-    log_alertTextMsg1 += ' ctrl={}'.format( self.controlsAllowed )
-    # trace1.printf( '' )
+    log_alertTextMsg1 += ' ctrl={}'.format( self.sm['health'].controlsAllowed )
+
     
 
     CC = car.CarControl.new_message()
@@ -480,12 +487,14 @@ class Controls:
     ldw_allowed = self.is_ldw_enabled and CS.vEgo > LDW_MIN_SPEED and not recent_blinker \
                     and not self.active and self.sm['liveCalibration'].calStatus == Calibration.CALIBRATED
 
+
+    poly_camera_offset = CAMERA_OFFSET + self.CP.lateralsRatom.cameraOffset
     meta = self.sm['model'].meta
     if len(meta.desirePrediction) and ldw_allowed:
       l_lane_change_prob = meta.desirePrediction[Desire.laneChangeLeft - 1]
       r_lane_change_prob = meta.desirePrediction[Desire.laneChangeRight - 1]
-      l_lane_close = left_lane_visible and (self.sm['pathPlan'].lPoly[3] < (1.08 - CAMERA_OFFSET))
-      r_lane_close = right_lane_visible and (self.sm['pathPlan'].rPoly[3] > -(1.08 + CAMERA_OFFSET))
+      l_lane_close = left_lane_visible and (self.sm['pathPlan'].lPoly[3] < (1.08 - poly_camera_offset))
+      r_lane_close = right_lane_visible and (self.sm['pathPlan'].rPoly[3] > -(1.08 + poly_camera_offset))
 
       CC.hudControl.leftLaneDepart = bool(l_lane_change_prob > LANE_DEPARTURE_THRESHOLD and l_lane_close)
       CC.hudControl.rightLaneDepart = bool(r_lane_change_prob > LANE_DEPARTURE_THRESHOLD and r_lane_close)
@@ -498,9 +507,10 @@ class Controls:
     self.AM.process_alerts(self.sm.frame)
     CC.hudControl.visualAlert = self.AM.visual_alert
 
-    if not self.hyundai_lkas and self.enabled:
+    if not self.hyundai_lkas:
       # send car controls over can
       can_sends = self.CI.apply(CC, self.sm, self.CP )
+      self.model_sum  = self.CI.CC.model_sum
       self.pm.send('sendcan', can_list_to_can_capnp(can_sends, msgtype='sendcan', valid=CS.canValid))
 
     force_decel = (self.sm['dMonitoringState'].awarenessStatus < 0.) or \
@@ -550,8 +560,10 @@ class Controls:
     controlsState.mapValid = self.sm['plan'].mapValid
     controlsState.forceDecel = bool(force_decel)
     controlsState.canErrorCounter = self.can_error_counter
+    controlsState.output = float(lac_log.output)
     controlsState.alertTextMsg1 = str(log_alertTextMsg1)
     controlsState.alertTextMsg2 = str(log_alertTextMsg2)
+    controlsState.modelSum = float(self.model_sum)  # self.CI.CC.model_speed   #, self.model_sum    
 
     if self.CP.lateralTuning.which() == 'pid':
       controlsState.lateralControlState.pidState = lac_log
@@ -582,6 +594,7 @@ class Controls:
       cp_send = messaging.new_message('carParams')
       cp_send.carParams = self.CP
       self.pm.send('carParams', cp_send)
+      print('carParams send steerRatio={}  '.format( self.sm.frame ) )
 
     # carControl
     cc_send = messaging.new_message('carControl')
@@ -606,7 +619,11 @@ class Controls:
     elif CS.cruiseState.enabled and self.hyundai_lkas:
       self.CP = CarInterface.live_tune( self.CP, True )      
       self.hyundai_lkas = False
-      self.init_flag = 1
+      self.init_flag = True
+
+      cp_send = messaging.new_message('carParams')
+      cp_send.carParams = self.CP
+      self.pm.send('carParams', cp_send)      
 
     self.update_events(CS)
 
@@ -614,6 +631,8 @@ class Controls:
       # Update control state
       self.state_transition(CS)
       self.prof.checkpoint("State transition")
+    else:
+      self.enabled = False
 
     # Compute actuators (runs PID loops and lateral MPC)
     actuators, v_acc, a_acc, lac_log = self.state_control(CS)

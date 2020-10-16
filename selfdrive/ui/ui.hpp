@@ -106,6 +106,7 @@ typedef struct UIScene {
   bool world_objects_visible;
   mat4 extrinsic_matrix;      // Last row is 0 so we can use mat4.
 
+  float model_sum;
   int  canErrorCounter;
   float v_cruise;
   uint64_t v_cruise_update_ts;
@@ -173,12 +174,14 @@ typedef struct UIScene {
   cereal::HealthData::HwType hwType;
   int satelliteCount;
   uint8_t athenaStatus;
-
-  std::string ipAddr;
+  int    nTimer;
 
   // pathcoloring
-  float output_scale;
-  bool steerOverride;
+  struct _KEGMEN_
+  {
+      bool steerOverride;
+      float output_scale;
+  } kegman;
 
   // dev ui
   uint16_t maxCpuTemp;
@@ -207,7 +210,7 @@ typedef struct UIScene {
     int learnerParams;
     float deadzone;
     float steerOffset;
-    float tireStiffnessFactor;
+    float  cameraOffset;
   };
 
   struct _CAR_PARAMS
@@ -227,10 +230,27 @@ typedef struct UIScene {
     float posenetSpeed;
   } liveParams;
 
+  struct _PathPlan
+  {
+    float laneWidth;
+    float steerRatio;
+    float steerActuatorDelay;
+
+    float cProb;
+    float lProb;
+    float rProb;
+
+    float angleOffset;
+
+    float lPoly;
+    float rPoly;
+  } pathPlan;  
+
   struct _CRUISE_STATE
   {
     bool standstill;
     int  modeSel;
+    int  cruiseSwState;
   } cruiseState;
 
 
@@ -246,6 +266,8 @@ typedef struct UIScene {
     int nSmoothBrightness;
     int nLightSensor;
   } params;
+
+
 
 } UIScene;
 
@@ -327,6 +349,7 @@ typedef struct UIState {
   bool awake;
 
   // timeouts
+  int is_awake_command;
   int awake_timeout;
   int volume_timeout;
   int controls_timeout;
@@ -370,9 +393,11 @@ typedef struct UIState {
   model_path_vertices_data model_path_vertices[MODEL_LANE_PATH_CNT * 2];
 
   track_vertices_data track_vertices[2];
+
 } UIState;
 
 // API
+void ui_awake_aleat(UIState *s, bool awake = true);
 void ui_draw_vision_alert(UIState *s, cereal::ControlsState::AlertSize va_size, int va_color,
                           const char* va_text1, const char* va_text2);
 void ui_draw(UIState *s);

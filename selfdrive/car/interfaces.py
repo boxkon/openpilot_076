@@ -23,6 +23,8 @@ class CarInterfaceBase():
     self.frame = 0
     self.low_speed_alert = False
     self.cruise_enabled_prev = False
+    self.pcm_enable_prev = False
+    self.pcm_enable_cmd = False
 
     if CarState is not None:
       self.CS = CarState(CP)
@@ -75,6 +77,26 @@ class CarInterfaceBase():
     ret.longitudinalTuning.kpV = [1.]
     ret.longitudinalTuning.kiBP = [0.]
     ret.longitudinalTuning.kiV = [1.]
+
+
+    ret.atomTuning.cvKPH    = [0.] 
+    ret.atomTuning.cvBPV    = [[150., 255.]]  # CV
+    ret.atomTuning.cvsMaxV  = [[255., 230.]]
+    ret.atomTuning.cvsdUpV  = [[3,3]]
+    ret.atomTuning.cvsdDnV  = [[7,5]]
+    
+    ret.atomTuning.sRKPH     = [30, 40, 80]   # Speed  kph
+    ret.atomTuning.sRBPV     = [[0.],      [0.],      [0.]     ]
+    ret.atomTuning.sRlqrkiV      = [[0.005],   [0.015],   [0.02]   ]
+    ret.atomTuning.sRlqrscaleV   = [[2000],    [1900.0],  [1850.0] ]
+    ret.atomTuning.sRpidKiV      = [[0.02,0.01,0.02],[0.03,0.02,0.03],[0.03,0.02,0.03]]
+    ret.atomTuning.sRpidKpV      = [[0.20,0.15,0.20],[0.25,0.20,0.25],[0.25,0.20,0.25]]
+    ret.atomTuning.sRsteerRatioV = [[13.95,13.85,13.95],[13.95,13.85,13.95],[13.95,13.85,13.95]]
+    ret.atomTuning.sRsteerActuatorDelayV = [[0.25,0.5,0.25],[0.25,0.8,0.25],[0.25,0.8,0.25]]
+  
+    ret.lateralsRatom.deadzone = 0.1
+    ret.lateralsRatom.steerOffset = 0
+    ret.lateralsRatom.cameraOffset = 0
     return ret
 
   # returns a car.CarState, pass in car.CarControl
@@ -127,15 +149,23 @@ class CarInterfaceBase():
 
     if not pcm_enable:
       pass
+    elif cs_out.gearShifter != GearShifter.drive:
+      self.cruise_enabled_prev = cs_out.cruiseState.enabled
+      if self.pcm_enable_prev:
+        self.pcm_enable_cmd = False
     elif cs_out.cruiseState.enabled != self.cruise_enabled_prev:
+      self.cruise_enabled_prev = cs_out.cruiseState.enabled
       if cs_out.cruiseState.enabled:
+        self.pcm_enable_cmd = True
+      else:
+        self.pcm_enable_cmd = False
+
+    if self.pcm_enable_prev != self.pcm_enable_cmd:
+      self.pcm_enable_prev = self.pcm_enable_cmd
+      if self.pcm_enable_cmd:
         events.add(EventName.pcmEnable)
       else:
         events.add(EventName.pcmDisable)
-      self.cruise_enabled_prev = cs_out.cruiseState.enabled
-
-
-
 
     return events
 

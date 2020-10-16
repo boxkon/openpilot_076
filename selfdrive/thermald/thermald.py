@@ -18,8 +18,6 @@ import cereal.messaging as messaging
 from selfdrive.loggerd.config import get_available_percent
 from selfdrive.pandad import get_expected_signature
 from selfdrive.thermald.power_monitoring import PowerMonitoring, get_battery_capacity, get_battery_status, get_battery_current, get_battery_voltage, get_usb_present
-import re
-import subprocess
 
 FW_SIGNATURE = get_expected_signature()
 
@@ -35,11 +33,12 @@ DISCONNECT_TIMEOUT = 5.  # wait 5 seconds before going offroad after disconnect 
 LEON = False
 last_eon_fan_val = None
 
-mediaplayer = '/data/openpilot/selfdrive/kyd/mediaplayer/'
 
 with open(BASEDIR + "/selfdrive/controls/lib/alerts_offroad.json") as json_file:
   OFFROAD_ALERTS = json.load(json_file)
 
+
+ 
 
 def read_tz(x, clip=True):
   if not ANDROID:
@@ -153,7 +152,7 @@ def handle_fan_uno(max_cpu_temp, bat_temp, fan_speed, ignition):
 
 def thermald_thread():
   # prevent LEECO from undervoltage
-  BATT_PERC_OFF = 100 #10 if LEON else 3
+  BATT_PERC_OFF = 90 #10 if LEON else 3
 
   health_timeout = int(1000 * 2.5 * DT_TRML)  # 2.5x the expected health frequency
 
@@ -199,18 +198,6 @@ def thermald_thread():
   accepted_terms = 0
   completed_training = 0
   panda_signature = 0
-
-  ts_last_ip = 0
-  ip_addr = '255.255.255.255'
-
-  # sound trigger
-  sound_trigger = 1
-
-  env = dict(os.environ)
-  env['LD_LIBRARY_PATH'] = mediaplayer
-
-  getoff_alert = Params().get('OpkrEnableGetoffAlert') == b'1'
-
   while 1:
     OpkrLoadStep += 1
     if OpkrLoadStep == 1:
@@ -296,17 +283,6 @@ def thermald_thread():
       msg.thermal.batteryPercent = 100
       msg.thermal.batteryStatus = "Charging"
 
-    # update ip every 10 seconds
-    ts = sec_since_boot()
-    if ts - ts_last_ip >= 10.:
-      try:
-        result = subprocess.check_output(["ifconfig", "wlan0"], encoding='utf8')  # pylint: disable=unexpected-keyword-arg
-        ip_addr = re.findall(r"inet addr:((\d+\.){3}\d+)", result)[0][0]
-      except:
-        ip_addr = 'N/A'
-      ts_last_ip = ts
-    msg.thermal.ipAddr = ip_addr
-
     current_filter.update(msg.thermal.batteryCurrent / 1e6)
 
     # TODO: add car battery voltage check
@@ -357,39 +333,42 @@ def thermald_thread():
     time_valid_prev = time_valid
 
     # Show update prompt
+    """
+    try:
+      last_update = datetime.datetime.fromisoformat(params.get("LastUpdateTime", encoding='utf8'))
+    except (TypeError, ValueError):
+      last_update = now
+    dt = now - last_update
 
-#    try:
-#      last_update = datetime.datetime.fromisoformat(params.get("LastUpdateTime", encoding='utf8'))
-#    except (TypeError, ValueError):
-#      last_update = now
-#    dt = now - last_update
+    update_failed_count = params.get("UpdateFailedCount")
+    update_failed_count = 0 if update_failed_count is None else int(update_failed_count)
 
-#    update_failed_count = params.get("UpdateFailedCount")
-#    update_failed_count = 0 if update_failed_count is None else int(update_failed_count)
-
-#    if dt.days > DAYS_NO_CONNECTIVITY_MAX and update_failed_count > 1:
-#      if current_connectivity_alert != "expired":
-#        current_connectivity_alert = "expired"
-#        params.delete("Offroad_ConnectivityNeededPrompt")
-#        put_nonblocking("Offroad_ConnectivityNeeded", json.dumps(OFFROAD_ALERTS["Offroad_ConnectivityNeeded"]))
-#    elif dt.days > DAYS_NO_CONNECTIVITY_PROMPT:
-#      remaining_time = str(max(DAYS_NO_CONNECTIVITY_MAX - dt.days, 0))
-#      if current_connectivity_alert != "prompt" + remaining_time:
-#        current_connectivity_alert = "prompt" + remaining_time
-#        alert_connectivity_prompt = copy.copy(OFFROAD_ALERTS["Offroad_ConnectivityNeededPrompt"])
-#        alert_connectivity_prompt["text"] += remaining_time + " days."
-#        params.delete("Offroad_ConnectivityNeeded")
-#        put_nonblocking("Offroad_ConnectivityNeededPrompt", json.dumps(alert_connectivity_prompt))
-#    elif current_connectivity_alert is not None:
-#      current_connectivity_alert = None
-#      params.delete("Offroad_ConnectivityNeeded")
-#      params.delete("Offroad_ConnectivityNeededPrompt")
+    if dt.days > DAYS_NO_CONNECTIVITY_MAX and update_failed_count > 1:
+      if current_connectivity_alert != "expired":
+        current_connectivity_alert = "expired"
+        params.delete("Offroad_ConnectivityNeededPrompt")
+        put_nonblocking("Offroad_ConnectivityNeeded", json.dumps(OFFROAD_ALERTS["Offroad_ConnectivityNeeded"]))
+    elif dt.days > DAYS_NO_CONNECTIVITY_PROMPT:
+      remaining_time = str(max(DAYS_NO_CONNECTIVITY_MAX - dt.days, 0))
+      if current_connectivity_alert != "prompt" + remaining_time:
+        current_connectivity_alert = "prompt" + remaining_time
+        alert_connectivity_prompt = copy.copy(OFFROAD_ALERTS["Offroad_ConnectivityNeededPrompt"])
+        alert_connectivity_prompt["text"] += remaining_time + " days."
+        params.delete("Offroad_ConnectivityNeeded")
+        put_nonblocking("Offroad_ConnectivityNeededPrompt", json.dumps(alert_connectivity_prompt))
+    elif current_connectivity_alert is not None:
+      current_connectivity_alert = None
+      params.delete("Offroad_ConnectivityNeeded")
+      params.delete("Offroad_ConnectivityNeededPrompt")
+    """
 
     #accepted_terms = params.get("HasAcceptedTerms") == terms_version
     #completed_training = params.get("CompletedTrainingVersion") == training_version
     #panda_signature = params.get("PandaFirmware")
 
     fw_version_match = (panda_signature is None) or (panda_signature == FW_SIGNATURE)   # don't show alert is no panda is connected (None)
+
+    #ignition = True  #  영상보기.
 
     should_start = ignition
 
@@ -445,10 +424,6 @@ def thermald_thread():
         off_ts = current_ts
         os.system('echo powersave > /sys/class/devfreq/soc:qcom,cpubw/governor')
 
-      if sound_trigger == 1 and msg.thermal.batteryStatus == "Discharging" and started_seen and (sec_since_boot() - off_ts) > 1 and getoff_alert:
-        subprocess.Popen([mediaplayer + 'mediaplayer', '/data/openpilot/selfdrive/assets/sounds/eondetach.wav'], shell = False, stdin=None, stdout=None, stderr=None, env = env, close_fds=True)
-        sound_trigger = 0
-
       # shutdown if the battery gets lower than 3%, it's discharging, we aren't running for
       # more than a minute but we were running
       power_shutdown = False
@@ -498,7 +473,7 @@ def thermald_thread():
     should_start_prev = should_start
 
     if usb_power:
-      pm.charging_ctrl( msg, ts, 80, 70 )
+      pm.charging_ctrl( msg, ts, 60, 40 )
 
     # report to server once per minute
     if (count % int(60. / DT_TRML)) == 0:

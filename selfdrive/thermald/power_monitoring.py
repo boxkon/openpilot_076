@@ -71,6 +71,8 @@ class PowerMonitoring:
     try:
       now = time.time()
 
+
+      
       # Check that time is valid
       if datetime.datetime.fromtimestamp(now).year < 2019:
         return
@@ -135,6 +137,7 @@ class PowerMonitoring:
             print( 'pulse = msg.thermal.batteryPercent={:.1f}'.format( msg.thermal.batteryPercent ) )
         else:
             print( 'skip = msg.thermal.batteryPercent={:.1f}'.format( msg.thermal.batteryPercent ) )
+
         self.next_pulsed_measurement_time = None
         return
 

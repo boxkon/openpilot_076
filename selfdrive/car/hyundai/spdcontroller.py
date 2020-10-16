@@ -12,7 +12,7 @@ from selfdrive.controls.lib.planner import calc_cruise_accel_limits
 from selfdrive.controls.lib.speed_smoother import speed_smoother
 from selfdrive.controls.lib.long_mpc import LongitudinalMpc
 
-from selfdrive.car.hyundai.values import Buttons, SteerLimitParams
+from selfdrive.car.hyundai.values import Buttons
 from common.numpy_fast import clip, interp
 
 from selfdrive.config import RADAR_TO_CAMERA
@@ -131,7 +131,7 @@ class SpdController():
             v_curvature = np.sqrt(a_y_max / np.clip(np.abs(curv), 1e-4, None))
             model_speed = np.min(v_curvature)
             # Don't slow down below 20mph
-            model_speed = max(30.0 * CV.MPH_TO_MS, model_speed)
+            model_speed = max(30.0 * CV.KPH_TO_MS, model_speed)
 
             model_sum = curv[2] * 1000.  #np.sum( curv, 0 )
 
@@ -183,13 +183,12 @@ class SpdController():
             self.curise_set_first = 1
             self.prev_VSetDis = int(CS.VSetDis)
             set_speed_kph = CS.VSetDis
-            if self.prev_clu_CruiseSwState != CS.cruise_buttons:  # MODE 전환.
-                if CS.cruise_buttons == Buttons.CANCEL: 
+            if not CS.main_on and self.prev_clu_CruiseSwState != CS.cruise_buttons:  # MODE 전환.
+                if CS.cruise_buttons == Buttons.GAP_DIST: 
                     self.cruise_set_mode += 1
-                if self.cruise_set_mode > 3:
+                if self.cruise_set_mode > 4:
                     self.cruise_set_mode = 0
                 self.prev_clu_CruiseSwState = CS.cruise_buttons
-            
 
         if set_speed_kph < 30:
             set_speed_kph = 30
