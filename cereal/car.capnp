@@ -329,8 +329,8 @@ struct CarControl {
       # these are the choices from the Honda
       # map as good as you can for your car
       none @0;
-      chimeEngage @1;
-      chimeDisengage @2;
+      chimeDisengage @1;
+      chimeEngage @2;      
       chimeError @3;
       chimeWarning1 @4;
       chimeWarning2 @5;
@@ -345,6 +345,13 @@ struct CarControl {
       chimeRoadWarning @14;
       chimeSeatBelt @15;
       chimeViewUncertain @16;
+      chimeDisengage2 @17;
+      chimeEngage2 @18;
+      chimeDing @19;
+      chimeCalibration2 @20;
+      chimeCalibration1 @21;
+      chimeDistracted @22;
+      chimeVision @23;
     }
   }
 }
