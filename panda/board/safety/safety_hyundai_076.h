@@ -9,7 +9,7 @@ const int HYUNDAI_STANDSTILL_THRSLD = 30;  // ~1kph
 const CanMsg HYUNDAI_TX_MSGS[] = {
   {832, 0, 8}, {832, 1, 8}, // LKAS11 Bus 0, 1
   {1265, 0, 4}, {1265, 1, 4}, {1265, 2, 4}, // CLU11 Bus 0, 1, 2
- // {1157, 0, 4}, // LFAHDA_MFC Bus 0
+  {1157, 0, 4}, // LFAHDA_MFC Bus 0
   {593, 2, 8},  // MDPS12, Bus 2
  // {1056, 0, 8}, //   SCC11,  Bus 0
  // {1057, 0, 8}, //   SCC12,  Bus 0
@@ -19,6 +19,7 @@ const CanMsg HYUNDAI_TX_MSGS[] = {
  // {790, 1, 8}, // EMS11, Bus 1
  // {912, 0, 7}, {912,1, 7}, // SPAS11, Bus 0, 1
  // {1268, 0, 8}, {1268,1, 8}, // SPAS12, Bus 0, 1
+ {1427, 0, 6},   // TPMS, Bus 0
  };
 
 // TODO: missing checksum for wheel speeds message,worst failure case is
@@ -27,13 +28,24 @@ const CanMsg HYUNDAI_TX_MSGS[] = {
 AddrCheckStruct hyundai_rx_checks[] = {
  // {.msg = {{608, 0, 8, .check_checksum = true, .max_counter = 3U, .expected_timestep = 10000U}}},   // EMS16
   // TODO: older hyundai models don't populate the counter bits in 902
-  //{.msg = {{902, 0, 8, .max_counter = 15U,  .expected_timestep = 10000U}}},  // WHL_SPD11
-  {.msg = {{902, 0, 8, .max_counter = 0U,  .expected_timestep = 10000U}}},     // WHL_SPD11
-  //{.msg = {{916, 0, 8, .check_checksum = true, .max_counter = 7U, .expected_timestep = 10000U}}},
-  {.msg = {{916, 0, 8, .check_checksum = false, .max_counter = 0U, .expected_timestep = 10000U}}},    // TCS13
-  {.msg = {{1057, 0, 8, .check_checksum = false, .max_counter = 15U, .expected_timestep = 20000U}}},   // SCC12
+  {.msg = {{608, 0, 8, .check_checksum = true, .max_counter = 3U, .expected_timestep = 10000U}}},
+  {.msg = {{902, 0, 8, .check_checksum = false, .max_counter = 15U, .expected_timestep = 10000U}}},
+  {.msg = {{916, 0, 8, .check_checksum = true, .max_counter = 7U, .expected_timestep = 10000U}}},
+  {.msg = {{1057, 0, 8, .check_checksum = true, .max_counter = 15U, .expected_timestep = 20000U}}},   // SCC12
 };
 const int HYUNDAI_RX_CHECK_LEN = sizeof(hyundai_rx_checks) / sizeof(hyundai_rx_checks[0]);
+
+// older hyundai models have less checks due to missing counters and checksums
+AddrCheckStruct hyundai_legacy_rx_checks[] = {
+  {.msg = {{608, 0, 8, .check_checksum = true, .max_counter = 3U, .expected_timestep = 10000U},
+           {881, 0, 8, .expected_timestep = 10000U}}},
+  {.msg = {{902, 0, 8, .expected_timestep = 10000U}}},
+  {.msg = {{916, 0, 8, .expected_timestep = 10000U}}},
+  {.msg = {{1057, 0, 8, .check_checksum = true, .max_counter = 15U, .expected_timestep = 20000U}}},
+};
+const int HYUNDAI_LEGACY_RX_CHECK_LEN = sizeof(hyundai_legacy_rx_checks) / sizeof(hyundai_legacy_rx_checks[0]);
+
+bool hyundai_legacy = false;
 
 static uint8_t hyundai_get_counter(CAN_FIFOMailBox_TypeDef *to_push) {
   int addr = GET_ADDR(to_push);
@@ -369,6 +381,22 @@ static int hyundai_fwd_hook(int bus_num, CAN_FIFOMailBox_TypeDef *to_fwd) {
   return bus_fwd;
 }
 
+static void hyundai_init(int16_t param) {
+  UNUSED(param);
+  controls_allowed = false;
+  relay_malfunction_reset();
+
+  hyundai_legacy = false;
+}
+
+static void hyundai_legacy_init(int16_t param) {
+  UNUSED(param);
+  controls_allowed = false;
+  relay_malfunction_reset();
+
+  hyundai_legacy = true;
+}
+
 const safety_hooks hyundai_hooks = {
   .init = nooutput_init,
   .rx = hyundai_rx_hook,
@@ -377,4 +405,14 @@ const safety_hooks hyundai_hooks = {
   .fwd = hyundai_fwd_hook,
   .addr_check = hyundai_rx_checks,
   .addr_check_len = sizeof(hyundai_rx_checks) / sizeof(hyundai_rx_checks[0]),
+};
+
+const safety_hooks hyundai_legacy_hooks = {
+  .init = hyundai_legacy_init,
+  .rx = hyundai_rx_hook,
+  .tx = hyundai_tx_hook,
+  .tx_lin = nooutput_tx_lin_hook,
+  .fwd = hyundai_fwd_hook,
+  .addr_check = hyundai_legacy_rx_checks,
+  .addr_check_len = sizeof(hyundai_legacy_rx_checks) / sizeof(hyundai_legacy_rx_checks[0]),
 };
