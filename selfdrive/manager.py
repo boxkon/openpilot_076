@@ -618,9 +618,9 @@ def main():
 
   if ANDROID:
     update_apks()
-  manager_init()
-  manager_prepare(spinner)
-  spinner.close()
+    manager_init()
+    manager_prepare(spinner)
+    spinner.close()
 
   if os.getenv("PREPAREONLY") is not None:
     return
