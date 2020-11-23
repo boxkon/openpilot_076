@@ -174,7 +174,7 @@ managed_processes = {
   "loggerd": ("selfdrive/loggerd", ["./loggerd"]),  # delete able
   "logmessaged": "selfdrive.logmessaged",   # delete able
   "locationd": "selfdrive.locationd.locationd",
-  #"tombstoned": "selfdrive.tombstoned",
+  "tombstoned": "selfdrive.tombstoned",
   "logcatd": ("selfdrive/logcatd", ["./logcatd"]),  # delete able
   "proclogd": ("selfdrive/proclogd", ["./proclogd"]),
   "boardd": ("selfdrive/boardd", ["./boardd"]),   # not used directly
