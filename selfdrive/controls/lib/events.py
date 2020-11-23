@@ -157,7 +157,7 @@ class EngagementAlert(Alert):
     super().__init__("", "",
                      AlertStatus.normal, AlertSize.none,
                      Priority.MID, VisualAlert.none,
-                     audible_alert, .2, 0., 0.),
+                     audible_alert, 2.2, 0., 0.),
 
 def below_steer_speed_alert(CP, sm, metric):
   speed = CP.minSteerSpeed * (CV.MS_TO_KPH if metric else CV.MS_TO_MPH)
@@ -213,7 +213,7 @@ EVENTS = {
       "경고: 이 Branch는 테스트되지 않았습니다",
       "안전운전을 위해 항상 핸들을 잡고 도로교통 상황을 주시하세요",
       AlertStatus.userPrompt, AlertSize.mid,
-      Priority.LOWER, VisualAlert.none, AudibleAlert.none, 0., 0., 15.),
+      Priority.LOWER, VisualAlert.none, AudibleAlert.chimeDing, 0.5, 0., 15.),
   },
 
   EventName.startupNoControl: {
@@ -221,7 +221,7 @@ EVENTS = {
       "대시캠 모드",
       "안전운전을 위해 항상 핸들을 잡고 도로교통 상황을 주시하세요",
       AlertStatus.normal, AlertSize.mid,
-      Priority.LOWER, VisualAlert.none, AudibleAlert.none, 0., 0., 15.),
+      Priority.LOWER, VisualAlert.none, AudibleAlert.chimeDing, 0.5, 0., 15.),
   },
 
   EventName.startupNoCar: {
@@ -229,7 +229,7 @@ EVENTS = {
       "대시캠 모드: 지원되지 않는 차량",
       "안전운전을 위해 항상 핸들을 잡고 도로교통 상황을 주시하세요",
       AlertStatus.normal, AlertSize.mid,
-      Priority.LOWER, VisualAlert.none, AudibleAlert.none, 0., 0., 15.),
+      Priority.LOWER, VisualAlert.none, AudibleAlert.chimeDing, 0.5, 0., 15.),
   },
 
   EventName.invalidGiraffeToyota: {
@@ -272,7 +272,7 @@ EVENTS = {
       "대시캠 모드",
       "미인식 차량",
       AlertStatus.normal, AlertSize.mid,
-      Priority.LOWER, VisualAlert.none, AudibleAlert.none, 0., 0., .2),
+      Priority.LOWER, VisualAlert.none, AudibleAlert.chimeError, 0.5, 0., .2),
   },
 
   EventName.stockAeb: {
@@ -312,7 +312,7 @@ EVENTS = {
       "CAN 오류: CAN 신호를 확인하세요",
       "",
       AlertStatus.normal, AlertSize.small,
-      Priority.LOW, VisualAlert.none, AudibleAlert.none, 0., 0., .2),
+      Priority.LOW, VisualAlert.none, AudibleAlert.chimeError, 0.5, 0., .2),
   },
 
   # ********** events only containing alerts that display while engaged **********
@@ -322,7 +322,7 @@ EVENTS = {
       "차량 매개 변수 식별 실패",
       "",
       AlertStatus.normal, AlertSize.small,
-      Priority.LOWEST, VisualAlert.none, AudibleAlert.none, .0, .0, .1),
+      Priority.LOWEST, VisualAlert.none, AudibleAlert.chimeError, 0.5, .0, .1),
   },
 
   EventName.steerTempUnavailableMute: {
@@ -335,7 +335,7 @@ EVENTS = {
 
   EventName.preDriverDistracted: {
     ET.WARNING: Alert(
-      "도로상황에 주의를 기울이세요 : 주행 산만",
+      "도로상황에 주의를 기울이세요 : 주의 산만",
       "",
       AlertStatus.normal, AlertSize.small,
       Priority.LOW, VisualAlert.none, AudibleAlert.none, .0, .1, .1, alert_rate=0.75),
@@ -344,7 +344,7 @@ EVENTS = {
   EventName.promptDriverDistracted: {
     ET.WARNING: Alert(
       "도로상황에 주의하세요",
-      "주행 산만",
+      "주의 산만",
       AlertStatus.userPrompt, AlertSize.mid,
       Priority.MID, VisualAlert.steerRequired, AudibleAlert.chimeRoadWarning, 4., .1, .1),
   },
@@ -352,7 +352,7 @@ EVENTS = {
   EventName.driverDistracted: {
     ET.WARNING: Alert(
       "경고: 조향제어가 즉시 해제됩니다",
-      "주행 산만",
+      "주의 산만",
       AlertStatus.critical, AlertSize.full,
       Priority.HIGH, VisualAlert.steerRequired, AudibleAlert.chimeWarningRepeat, .1, .1, .1),
   },
@@ -362,7 +362,7 @@ EVENTS = {
       "핸들을 터치하세요: 모니터링 없음",
       "",
       AlertStatus.normal, AlertSize.small,
-      Priority.LOW, VisualAlert.none, AudibleAlert.none, .0, .1, .1, alert_rate=0.75),
+      Priority.LOW, VisualAlert.none, AudibleAlert.chimeError, 0.5, .1, .1, alert_rate=0.75),
   },
 
   EventName.promptDriverUnresponsive: {
@@ -438,7 +438,7 @@ EVENTS = {
       "차선 변경 중",
       "다른 차량에 주의하세요",
       AlertStatus.normal, AlertSize.mid,
-      Priority.LOW, VisualAlert.none, AudibleAlert.none, .0, .1, .1),
+      Priority.LOW, VisualAlert.none, AudibleAlert.chimeLaneChange, 5.0, .1, .1),
   },
 
   EventName.laneChangeManual: {
@@ -446,7 +446,7 @@ EVENTS = {
       "사용자 방향 전환 중",
       "다른 차량에 주의하세요",
       AlertStatus.userPrompt, AlertSize.mid,
-      Priority.LOW, VisualAlert.none, AudibleAlert.none, .0, .1, .1, alert_rate=0.75),
+      Priority.LOW, VisualAlert.none, AudibleAlert.chimeDing, .5, .1, alert_rate=0.75),
   },
 
   EventName.emgButtonManual: {
@@ -538,7 +538,7 @@ EVENTS = {
       "핸들을 잡아주세요",
       "전방 영상 인식 불안",
       AlertStatus.userPrompt, AlertSize.mid,
-      Priority.LOW, VisualAlert.steerRequired, AudibleAlert.chimeWarning1, .4, 2., 3.),
+      Priority.LOW, VisualAlert.steerRequired, AudibleAlert.chimeVision, 4.4, 2., 3.),
     ET.NO_ENTRY: NoEntryAlert("전방 영상 인식 불안"),
   },
 
@@ -589,8 +589,9 @@ EVENTS = {
   },
 
   EventName.wrongGear: {
-    ET.USER_DISABLE: EngagementAlert(AudibleAlert.chimeDisengage),  #ET.SOFT_DISABLE: SoftDisableAlert("기어가 드라이브모드가 아닙니다"),
-    ET.NO_ENTRY: NoEntryAlert("기어가 드라이브모드가 아닙니다"),
+    ET.SOFT_DISABLE: SoftDisableAlert("기어를 드라이브 모드로 변경하세요"),
+    ET.NO_ENTRY: NoEntryAlert("기어를 드라이브 모드로 변경하세요",
+                              audible_alert=AudibleAlert.chimeGearDrive),
   },
 
   EventName.calibrationInvalid: {
@@ -599,19 +600,22 @@ EVENTS = {
   },
 
   EventName.calibrationIncomplete: {
-    ET.SOFT_DISABLE: SoftDisableAlert("캘리브레이션 진행 중"),
     ET.PERMANENT: calibration_incomplete_alert,
-    ET.NO_ENTRY: NoEntryAlert("캘리브레이션 진행 중"),
+    ET.SOFT_DISABLE: SoftDisableAlert("캘리브레이션 진행 중"),
+    ET.NO_ENTRY: NoEntryAlert("캘리브레이션 진행 중",
+                              audible_alert=AudibleAlert.chimeCalibration2),
   },
 
   EventName.doorOpen: {
     ET.SOFT_DISABLE: SoftDisableAlert("도어가 열려있습니다"),
-    ET.NO_ENTRY: NoEntryAlert("도어가 열려있습니다"),
+    ET.NO_ENTRY: NoEntryAlert("도어가 열려있습니다",
+                              audible_alert=AudibleAlert.chimeDoorOpen),
   },
 
   EventName.seatbeltNotLatched: {
     ET.SOFT_DISABLE: SoftDisableAlert("안전벨트를 체결하세요"),
-    ET.NO_ENTRY: NoEntryAlert("안전벨트를 체결하세요"),
+    ET.NO_ENTRY: NoEntryAlert("안전벨트를 체결하세요",
+                              audible_alert=AudibleAlert.chimeSeatBelt),
   },
 
   EventName.espDisabled: {
@@ -697,8 +701,13 @@ EVENTS = {
   },
 
   EventName.reverseGear: {
-    ET.USER_DISABLE: EngagementAlert(AudibleAlert.chimeDisengage),
-    ET.NO_ENTRY: NoEntryAlert("후진 기어"),
+    ET.PERMANENT: Alert(
+      "기어 [R] 상태",
+      "차량 후방을 확인하세요",
+      AlertStatus.normal, AlertSize.full,
+      Priority.LOWEST, VisualAlert.none, AudibleAlert.chimeDing, 0.5, 0., .2, creation_delay=0.2),
+    ET.SOFT_DISABLE: SoftDisableAlert("기어 [R] 상태"),
+    ET.NO_ENTRY: NoEntryAlert("기어 [R] 상태"),
   },
 
   EventName.cruiseDisabled: {
