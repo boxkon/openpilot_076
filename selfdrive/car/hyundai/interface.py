@@ -107,6 +107,36 @@ class CarInterface(CarInterfaceBase):
       ret.steerRatio = 16.5
       ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kpBP = [[0.], [0.]]
       ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.16], [0.01]]
+    elif candidate == CAR.GENESIS_G70:
+      ret.mass = 1640. + STD_CARGO_KG
+      ret.wheelbase = 2.84
+    elif candidate == CAR.GENESIS_G80:
+      ret.mass = 1855. + STD_CARGO_KG
+      ret.wheelbase = 3.01
+    elif candidate == CAR.GENESIS_G90:
+      ret.mass = 2120
+      ret.wheelbase = 3.16
+      
+      ret.lateralTuning.init('lqr')
+      ret.lateralTuning.lqr.scale = 1680 #Scale
+      ret.lateralTuning.lqr.ki = 0.001
+      ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
+      ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
+      ret.lateralTuning.lqr.c = [1., 0.]
+      ret.lateralTuning.lqr.k = [-110.73572306, 451.22718255]
+      ret.lateralTuning.lqr.l = [0.3233671, 0.3185757]
+      ret.lateralTuning.lqr.dcGain = 0.002858 #DcGain
+      ret.steerMaxV = [1.65]
+      ret.steerMaxBP = [0.]
+
+      ret.steerActuatorDelay = 0.2  # Default delay
+      ret.steerRateCost = 0.575
+      ret.steerLimitTimer = 1.5
+      ret.steerRatio = 14.15
+
+    elif candidate == CAR.GENESIS_G90_L:
+      ret.mass = 2290
+      ret.wheelbase = 3.45
     elif candidate in [CAR.K5, CAR.SONATA]:
       ret.lateralTuning.pid.kf = 0.00005
       ret.mass = 1470. + STD_CARGO_KG
@@ -312,6 +342,24 @@ class CarInterface(CarInterfaceBase):
     ret.sccBus = 0 if 1056 in fingerprint[0] else 1 if 1056 in fingerprint[1] and 1296 not in fingerprint[1] \
                                                                      else 2 if 1056 in fingerprint[2] else -1
 
+    # no rear steering, at least on the listed cars above
+    ret.steerRatioRear = 0.
+    ret.steerControlType = car.CarParams.SteerControlType.torque
+
+    ret.longitudinalTuning.kpBP = [0., 10., 40.]
+    ret.longitudinalTuning.kpV = [1.2, 0.6, 0.2]
+    ret.longitudinalTuning.kiBP = [0., 10., 30., 40.]
+    ret.longitudinalTuning.kiV = [0.05, 0.02, 0.01, 0.005]
+    ret.longitudinalTuning.deadzoneBP = [0., 40]
+    ret.longitudinalTuning.deadzoneV = [0., 0.02]
+
+    # steer, gas, brake limitations VS speed
+
+    ret.gasMaxBP = [0., 10., 40.]
+    ret.gasMaxV = [0.5, 0.5, 0.5]
+    ret.brakeMaxBP = [0., 20.]
+    ret.brakeMaxV = [1., 0.8]
+    
     ret.openpilotLongitudinalControl = False
 
     return ret
