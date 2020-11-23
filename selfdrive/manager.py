@@ -174,7 +174,7 @@ managed_processes = {
   "loggerd": ("selfdrive/loggerd", ["./loggerd"]),  # delete able
   "logmessaged": "selfdrive.logmessaged",   # delete able
   "locationd": "selfdrive.locationd.locationd",
-  "tombstoned": "selfdrive.tombstoned",
+  #"tombstoned": "selfdrive.tombstoned",
   "logcatd": ("selfdrive/logcatd", ["./logcatd"]),  # delete able
   "proclogd": ("selfdrive/proclogd", ["./proclogd"]),
   "boardd": ("selfdrive/boardd", ["./boardd"]),   # not used directly
@@ -564,10 +564,10 @@ def main():
   params.manager_start()
 
   default_params = [
-    ("CommunityFeaturesToggle", "0"),
+    ("CommunityFeaturesToggle", "1"),
     ("CompletedTrainingVersion", "0"),
     ("IsRHD", "0"),
-    ("IsMetric", "0"),
+    ("IsMetric", "1"),
     ("RecordFront", "0"),
     ("HasAcceptedTerms", "0"),
     ("HasCompletedSetup", "0"),
@@ -583,7 +583,7 @@ def main():
     ("LaneChangeEnabled", "1"),
     ("IsDriverViewEnabled", "0"),
     ("IsOpenpilotViewEnabled", "0"),
-    ("OpkrAutoShutdown", "0"),
+    ("OpkrAutoShutdown", "3"),
     ("OpkrAutoScreenOff", "0"),
     ("OpkrUIBrightness", "0"),
     ("OpkrEnableDriverMonitoring", "1"),
@@ -594,7 +594,7 @@ def main():
     ("OpkrTraceSet", "1"),
     ("OpkrWhoisDriver", "0"),
     ("OpkrTuneStartAt", "0"),
-    ("OpkrAccelProfile", "0"),   #악셀프로파일 0:미사용, 1:브드럽게,2:보통,3:빠르게
+    ("OpkrAccelProfile", "1"),   #악셀프로파일 0:미사용, 1:브드럽게,2:보통,3:빠르게
     ("OpkrAutoLanechangedelay", "0"),
     ("OpkrRunMixplorer", "0"),
     ("OpkrRunQuickedit", "0"),
