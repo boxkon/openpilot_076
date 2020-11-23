@@ -28,6 +28,7 @@ void set_volume(int volume) {
 
 
 sound_file sound_table[] = {
+  { cereal::CarControl::HUDControl::AudibleAlert::NONE, NULL, false },
   { cereal::CarControl::HUDControl::AudibleAlert::CHIME_DISENGAGE, "../assets/sounds/disengagedt.wav", false },
   { cereal::CarControl::HUDControl::AudibleAlert::CHIME_ENGAGE, "../assets/sounds/engagedt.wav", false },
   { cereal::CarControl::HUDControl::AudibleAlert::CHIME_WARNING1, "../assets/sounds/warning_1.wav", false },
@@ -46,12 +47,11 @@ sound_file sound_table[] = {
   { cereal::CarControl::HUDControl::AudibleAlert::CHIME_VIEW_UNCERTAIN, "../assets/sounds/viewuncertain.wav", false },
   { cereal::CarControl::HUDControl::AudibleAlert::CHIME_DISENGAGE2, "../assets/sounds/disengaged.wav", false },
   { cereal::CarControl::HUDControl::AudibleAlert::CHIME_ENGAGE2, "../assets/sounds/engaged.wav", false },
-  { cereal::CarControl::HUDControl::AudibleAlert::CHIME_DING "../assets/sounds/ding.wav", false },
+  { cereal::CarControl::HUDControl::AudibleAlert::CHIME_DING, "../assets/sounds/ding.wav", false },
   { cereal::CarControl::HUDControl::AudibleAlert::CHIME_CALIBRATION1, "../assets/sounds/calibration1.wav", false },
   { cereal::CarControl::HUDControl::AudibleAlert::CHIME_CALIBRATION2, "../assets/sounds/calibration2.wav", true },
-  { cereal::CarControl::HUDControl::AudibleAlert::CHIME_DISTRACTED, "../assets/sounds/warning_distracted.wav", false },
-  { cereal::CarControl::HUDControl::AudibleAlert::CHIME_VISION, "../assets/sounds/vision.wav", false },
-  { cereal::CarControl::HUDControl::AudibleAlert::NONE, NULL, false },
+  { cereal::CarControl::HUDControl::AudibleAlert::CHIME_DISTRACTED, "../assets/sounds/distracted.wav", false },
+  { cereal::CarControl::HUDControl::AudibleAlert::CHIME_VISION, "../assets/sounds/vision.wav", false },  
 };
 
 sound_file* get_sound_file(AudibleAlert alert) {
